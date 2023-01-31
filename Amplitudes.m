@@ -34,8 +34,7 @@ fabc::usage="fabc[a,b,c] is the Head used to represent the structure constant fa
 TrSUN::usage="TrSUN[a1,a2,a3...] is the head/variable (not a function!) used to represent the SU(N) trace over the generators Tr[T^a1 T^a2...]";
 ListMult::usage="ListMult[list1,list2] returns the pairwise multiplication of the lists and deletes the duplicates";
 ListPower::usage="ListPower[list,n] returns the pairwise multiplication of list with itself n times";
-RepP::usage="RepP[expr,pOld,pNew] replaces the old list of momenta pOld with the new list of momenta pNew in the expression expr";
-RepPAndE::usage="RepPAndE[expr,pOld,pNew,eOld,eNew] replaces the old list of momenta pOld and polarization vectors eOld with the new list of momenta pNew and polarization vectors eNew in the expression expr";
+RepList::usage="RepList[ListOld,ListNew] generates a set of replacement rules to replace the entries of ListOld with the entries of ListNew";
 CyclicPermP::usage="CyclicPermP[expr,pList,cycle] cycliclally permutes the momenta in the expression and returns the result.  Cycle=0 returns the original expression, cycle=1 permutes the momenta once 1->2, 2->3, etc.";
 CyclicPermPAndE::usage="CyclicPermPAndE[expr,pList,eList,cycle] cycliclally permutes the momenta and polarization vectors in the expression and returns the result.  Cycle=0 returns the original expression, cycle=1 permutes the momenta once 1->2, 2->3, etc.";
 CyclicSumP::usage="CyclicSumP[expr,pList,MaxCycle] computes the cyclic sum of the expression over the momenta.  MaxCycle=1 just returns the original expression, MaxCycle=2 returns the original expression plus the expression with the momenta cycled one position to the left, etc.";
@@ -63,7 +62,7 @@ NullLVecQ[p_]:=MemberQ[NullLVecList,p];
 AddNullLVec[p__]:=(AddLVec[p];NullLVecList=Union[NullLVecList,{p}];);
 DelNullLVec[p_]:=(DelLVec[p];NullLVecList=DeleteCases[NullLVecList,p];);
 
-(*---Define the Minkowsky product---*)
+(*---Define the Lorentz product---*)
 SetAttributes[d,Orderless];
 d[p1_Plus,p2_]:=Map[d[#,p2]&,p1];
 d[p1_,num__ p2_?LVecQ]:=num d[p1,p2];
@@ -72,7 +71,14 @@ d[p_?NullLVecQ,p_?NullLVecQ]:=0;
 d[p1:{__},p2:{__}]:=p1 . p2-2p1[[1]]p2[[1]];
 d2[p_]:=d[p,p];
 d2[p:{__}]:=p . p-2p[[1]]^2;
-(*Todo:  include d[0,_]:=0;  I'm not sure why I haven't done this.*)
+(*
+TODO:
+*Include d[0,_]:=0;  I'm not sure why I haven't done this.
+*I don't think I need NullLVec.  I barely ever use it.
+*Add Heads to LVecList instead of individual vectors.  So add p instead of p[1], p[2]...
+LVecHeads={p,k...};
+LVecQ[x_]:=MemberQ[LVecHeads,Head[x]];
+*)
 
 (*---Mandelstam basis generation---*)
 PBasis[pList_]:=Module[{n,pp,ret},n=Length[pList];
@@ -229,33 +235,18 @@ ListPower[list_,k_]:=ListMult[ListPower[list,k-1],list];(*This recursive definit
 
 (*---Replacement functions, cyclic sums, and fundamental BCJ ---*)
 
-RepP[expr_,pList_,pNew_]:=Module[{nLength,listP,tmpP,pRepForward,pRepBackward},
-nLength=Length[pList];
-listP=Array[tmpP,nLength];
-pRepForward=Dispatch[MapThread[Rule,{pList,listP}]];
-pRepBackward=Dispatch[MapThread[Rule,{listP,pNew}]];
-(expr/.pRepForward)/.pRepBackward];
+RepList[ListOld_,ListNew_]:=Dispatch[MapThread[Rule,{ListOld,ListNew}]];
 
-RepPAndE[expr_,pList_,pNew_,eList_,eNew_]:=Module[{nLength,listP,listE,tmpP,tmpE,pRepForward,eRepForward,pRepBackward,eRepBackward},
-nLength=Length[pList];
-listP=Array[tmpP,nLength];
-listE=Array[tmpE,nLength];
-pRepForward=Dispatch[MapThread[Rule,{pList,listP}]];
-eRepForward=Dispatch[MapThread[Rule,{eList,listE}]];
-pRepBackward=Dispatch[MapThread[Rule,{listP,pNew}]];
-eRepBackward=Dispatch[MapThread[Rule,{listE,eNew}]];
-(expr/.pRepForward/.eRepForward)/.pRepBackward/.eRepBackward];
-
-PermSumP[expr_,pList_]:=Sum[RepP[expr,pList,perm],{perm,Permutations[pList]}];
+PermSumP[expr_,pList_]:=Sum[expr/.RepList[pList,perm],{perm,Permutations[pList]}];
 
 CyclicPermP[x_,pList_,Cycle_]:=Module[{pNew},
 pNew=RotateLeft[pList,Cycle];
-RepP[x,pList,pNew]];
+x/.RepList[pList,pNew]];
 
 CyclicPermPAndE[x_,pList_,eList_,Cycle_]:=Module[{pNew,eNew},
 pNew=RotateLeft[pList,Cycle];
 eNew=RotateLeft[eList,Cycle];
-RepPAndE[x,pList,pNew,eList,eNew]];
+x/.RepList[Join[pList,eList],Join[pNew,eNew]]];
 
 CyclicSumP[x_,pList_,MaxCycle_]:=
 Sum[CyclicPermP[x,pList,i],{i,0,MaxCycle-1}];
@@ -263,9 +254,9 @@ Sum[CyclicPermP[x,pList,i],{i,0,MaxCycle-1}];
 CyclicSumPAndE[x_,pList_,eList_,MaxCycle_]:=
 Sum[CyclicPermPAndE[x,pList,eList,i],{i,0,MaxCycle-1}];
 
-BCJp[amp_,pList_]:=Sum[Sum[d[pList[[2]],pList[[j]]],{j,3,i}]RepP[amp,pList,Insert[Delete[pList,2],pList[[2]],i]],{i,3,Length[pList]}];
+BCJp[amp_,pList_]:=Sum[Sum[d[pList[[2]],pList[[j]]],{j,3,i}](amp/.RepList[pList,Insert[Delete[pList,2],pList[[2]],i]]),{i,3,Length[pList]}];
 
-BCJpe[amp_,pList_,eList_]:=Sum[Sum[d[pList[[2]],pList[[j]]],{j,3,i}]RepPAndE[amp,pList,Insert[Delete[pList,2],pList[[2]],i],eList,Insert[Delete[eList,2],eList[[2]],i]],{i,3,Length[pList]}];
+BCJpe[amp_,pList_,eList_]:=Sum[Sum[d[pList[[2]],pList[[j]]],{j,3,i}](amp/.RepList[Join[pList,eList],Join[Insert[Delete[pList,2],pList[[2]],i],Insert[Delete[eList,2],eList[[2]],i]]]),{i,3,Length[pList]}];
 
 
 (*--- Contract mu indices ---*)
