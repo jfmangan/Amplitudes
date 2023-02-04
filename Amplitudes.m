@@ -2,14 +2,10 @@
 
 BeginPackage["Amplitudes`"]
 
-RetLVecList::usage="Returns the contents of LVecList, the list of all Lorentz vectors.";
-LVecQ::usage="LVecQ[p] returns true if p is in LVecList and false otherwise.";
-AddLVec::usage="AddLVec[p] and AddLVec[p1,...pn] adds the momenta to LVecList, the list of Lorentz vectors.";
-DelLVec::usage="DelLVec[p] deletes p from LVecList, the list of Lorentz vectors.";
-RetNullLVecList::usage="Returns the contents of NullLVecList, the list of all null Lorentz vectors.";
-NullLVecQ::usage="NullLVecQ[p] returns true if p is in NullLVecList and false otherwise.";
-AddNullLVec::usage="AddLVec[p] and AddLVec[p1,...pn] adds the momenta to NullLVecList, the list of null Lorentz vectors, and adds the momenta to LVecList, the list of all Lorentz vectors.";
-DelNullLVec::usage="DelNullLVec[p] deletes p from NullLVecList, the list of null Lorentz vectors, and deletes p from LVecList, the list of all Lorentz vectors.";
+RetLVecHeads::usage="Returns the contents of LVecHeads, the Heads of all Lorentz vectors.";
+LVecQ::usage="LVecQ[vec] returns true if vec is in LVecHeads and false otherwise.";
+AddLVecHeads::usage="AddLVecHeads[p] and AddLVecHeads[p, e...] adds p (and e) to LVecHeads, the list of all Heads of Lorentz vectors.  p[1], p[2]... will all be vaild LVecs.";
+DelLVecHeads::usage="DelLVecHeads[p] deletes p from LVecHeads, the list of Lorentz vector Heads.";
 d::usage="d[p1,p2] is the Lorentz dot product of p1 and p2.  If the input is numerical vectors, then d returns the product with (-+++...) signature.";
 d2::usage="d2[p] is the Lorentz dot product p^2";
 PBasis::usage="PBasis[{p1,p2,...}] returns a minimal set of Mandelstams d[pi,pj] that can construct all Mandelstams d[pi,pj]";
@@ -50,35 +46,21 @@ RndMax::usage="RndMax controls the size of the random numbers generated in this 
 
 Begin["`Private`"]
 
-(*---Define LVecList and NullLVecList---*)
-LVecList={};
-RetLVecList:=LVecList;
-LVecQ[p_]:=MemberQ[LVecList,p]; 
-AddLVec[p__]:=(LVecList=Union[LVecList,{p}];);
-DelLVec[p_]:=(LVecList=DeleteCases[LVecList,p];);
-NullLVecList={};
-RetNullLVecList:=NullLVecList;
-NullLVecQ[p_]:=MemberQ[NullLVecList,p]; 
-AddNullLVec[p__]:=(AddLVec[p];NullLVecList=Union[NullLVecList,{p}];);
-DelNullLVec[p_]:=(DelLVec[p];NullLVecList=DeleteCases[NullLVecList,p];);
+(*---Define LVecList---*)
+LVecHeads={};
+RetLVecHeads:=LVecHeads;
+LVecQ[vec_]:=MemberQ[LVecHeads,Head[vec]]; 
+AddLVecHeads[p__]:=(LVecHeads=Union[LVecHeads,{p}];);
+DelLVecHeads[p_]:=(LVecHeads=DeleteCases[LVecHeads,p];);
 
 (*---Define the Lorentz product---*)
 SetAttributes[d,Orderless];
 d[p1_Plus,p2_]:=Map[d[#,p2]&,p1];
 d[p1_,num__ p2_?LVecQ]:=num d[p1,p2];
 d[p1_,num__?(FreeQ[#,_?LVecQ]&) p2_Plus]:=num d[p1,p2];
-d[p_?NullLVecQ,p_?NullLVecQ]:=0;
 d[p1:{__},p2:{__}]:=p1 . p2-2p1[[1]]p2[[1]];
 d2[p_]:=d[p,p];
 d2[p:{__}]:=p . p-2p[[1]]^2;
-(*
-TODO:
-*Include d[0,_]:=0;  I'm not sure why I haven't done this.
-*I don't think I need NullLVec.  I barely ever use it.
-*Add Heads to LVecList instead of individual vectors.  So add p instead of p[1], p[2]...
-LVecHeads={p,k...};
-LVecQ[x_]:=MemberQ[LVecHeads,Head[x]];
-*)
 
 (*---Mandelstam basis generation---*)
 PBasis[pList_]:=Module[{n,pp,ret},n=Length[pList];
