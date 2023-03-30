@@ -10,10 +10,10 @@ d::usage="d[p1,p2] is the Lorentz dot product of p1 and p2.  If the input is num
 d2::usage="d2[p] is the Lorentz dot product p^2";
 PBasis::usage="PBasis[{p1,p2,...}] returns a minimal set of Mandelstams d[pi,pj] that can construct all Mandelstams d[pi,pj]";
 PAndEBasis::usage="PAndEBasis[{p1,p2,...},{e1,e2,...}] returns a minimal set of Mandelstams d[pi,pj], d[pi,ej], d[ei,ej] that can construct all Mandelstams";
-RepPAnalytical::usage="RepPAnalytical[{p1,p2,...},m] returns the set of replacement rules that will reduce any Mandelstams d[pi,pj] to the basis Mandelstams given by PBasis for particles of mass m";
-RepPAndEAnalytical::usage="RepPAndEAnalytical[{p1,p2,...},{e1,e2,...},m] returns the set of replacement rules that will reduce any Mandelstams to the basis Mandelstams given by PAndEBasis for particles of mass m";
-RepPNumerical::usage="RepPNumerical[{p1,p2,...},m] returns a set of numerical replacement rules for the Mandelstams d[pi,pj] for particles of mass m.  The characteristic numerical value of the kinematic is set by the global variable RndMax.  The numerical values tend to be positive and non-zero to avoid accidentally hitting a pole.";
-RepPAndENumerical::usage="RepPAndENumerical[{p1,p2,...},{e1,e2,...},m] returns a set of numerical replacement rules for Mandelstams for particles of mass m.  The characteristic numerical value of the kinematic is set by the global variable RndMax.  The numerical values tend to be positive and non-zero to avoid accidentally hitting a pole.";
+RepPAnalytical::usage="RepPAnalytical[{p1,p2,...},m] returns the set of replacement rules that will reduce any Mandelstams d[pi,pj] to the basis Mandelstams given by PBasis.  Note that the particle mass m is an optional parameter that defaults to 0.";
+RepPAndEAnalytical::usage="RepPAndEAnalytical[{p1,p2,...},{e1,e2,...},m] returns the set of replacement rules that will reduce any Mandelstams to the basis Mandelstams given by PAndEBasis.  Note that the particle mass m is an optional parameter that defaults to 0.";
+RepPNumerical::usage="RepPNumerical[{p1,p2,...},m] returns a set of numerical replacement rules for the Mandelstams d[pi,pj].  Note that the particle mass m is an optional parameter that defaults to 0.  The characteristic numerical value of the Mandelstams is set by the global variable RndMax.  The numerical values tend to be positive and non-zero to avoid accidentally hitting a pole.";
+RepPAndENumerical::usage="RepPAndENumerical[{p1,p2,...},{e1,e2,...},m] returns a set of numerical replacement rules for Mandelstams.  Note that the particle mass m is an optional parameter that defaults to 0.  The characteristic numerical value of the Mandelstams is set by the global variable RndMax.  The numerical values tend to be positive and non-zero to avoid accidentally hitting a pole.";
 Spaa::usage="Spaa[x,y] is the 4D double angle spinor product <xy>.";
 Spbb::usage="Spbb[x,y] is the 4D double brack spinor product [xy].";
 SpBasis::usage="SpBasis[SpinorList] returns an independent set of Spaa's and Spbb's.";
@@ -81,14 +81,14 @@ Table[peInclude[[n]][[i]]=0,{i,1,n}];(*From momentum conservation sum_{j} pj.ei=
 DeleteCases[Flatten[Join[ret,Table[peInclude[[i]][[j]]pe[i,j],{i,1,n},{j,1,n}]]],0]
 ];
 
-RepPAnalytical[pList_,m_]:=Module[{n,pp,ret},n=Length[pList];
+RepPAnalytical[pList_,m_:0]:=Module[{n,pp,ret},n=Length[pList];
 pp[i_,j_]:=d[pList[[i]],pList[[j]]];
 ret=Table[pp[i,i]->-m^2,{i,1,n}];(*The diagonal is fixed via pi^2=-m^2.*)
 AppendTo[ret,pp[1,2]->m^2 (n-2)/2-Sum[pp[1,j],{j,3,n-1}]-Sum[pp[i,j],{i,2,n-1},{j,i+1,n-1}]];(*Fix p1.p2 using -m^2=pn^2=(p1+p2+...)^2*)
 ret=Flatten[Join[ret,Table[pp[n,i]->-Sum[pp[j,i],{j,1,n-1}]/.ret,{i,1,n-1}]]];(*Use momentum convservation 0=sum(pi.pj) to fix pn.pi=-(p1.pi+p2.pi...)*)
 DeleteCases[ret,0->0](*If m=0 and pi is a NullLVec then d[p1,p1] is 0 automatically so you don't want to add the rule 0\[Rule]0*)];
 
-RepPAndEAnalytical[pList_,eList_,m_]:=Module[{n,pe,ee,ret},n=Length[pList];
+RepPAndEAnalytical[pList_,eList_,m_:0]:=Module[{n,pe,ee,ret},n=Length[pList];
 pe[i_,j_]:=d[pList[[i]],eList[[j]]];
 ee[i_,j_]:=d[eList[[i]],eList[[j]]];
 ret=RepPAnalytical[pList,m];
@@ -101,11 +101,11 @@ Flatten[Join[ret,Table[pe[n,i]->-Sum[pe[j,i],{j,1,n-1}]/.pe[i,i]->0,{i,1,n-1}]]]
 RndInt[n_]:=RandomInteger[{1,RndMax},{n}];(*The reason you take random ints from 1 to RndMax is that almost all of the Mandelstams are positive.  This means that it is very unlikely to have a propagator that is identically zero.  Most of the negative Mandelstams will come from conserving momentum so those negative Mandelstams will never make a propagator negative since you'd never have a propagator involving all the momenta since that'd be identically zero no matter what.*)
 (*Fix p1.p2 using 0=pn^2=(p1+p2+...)^2*)
 
-RepPNumerical[pList_,m_]:=Module[{basis,ret},basis=PBasis[pList];
+RepPNumerical[pList_,m_:0]:=Module[{basis,ret},basis=PBasis[pList];
 ret=MapThread[Rule,{basis,RndInt[Length[basis]]}];
 Join[ret,RepPAnalytical[pList,m]/.ret]];
 
-RepPAndENumerical[pList_,eList_,m_]:=Module[{basis,ret},basis=PAndEBasis[pList,eList];
+RepPAndENumerical[pList_,eList_,m_:0]:=Module[{basis,ret},basis=PAndEBasis[pList,eList];
 ret=MapThread[Rule,{basis,RndInt[Length[basis]]}];
 Join[ret,RepPAndEAnalytical[pList,eList,m]/.ret]];
 
