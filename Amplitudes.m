@@ -43,6 +43,9 @@ ContractMu::usage="ContractMu[mu,dim][expr] will expand the expression and contr
 RndMax=10;
 RndMax::usage="RndMax controls the size of the random numbers generated in this package.  Its default value is 10 but you can change that if you want.  All of the numerical functions in this package depend implicitly/internally on RndMax.";
 
+MetricSignature=1;
+MetricSignature::usage="MetricSignature controls the sign of the signature of d[x,y].  MetricSignature defaults to +1 for a mostly plus metric but you can set it to -1 for a mostly minus metric."
+
 
 Begin["`Private`"]
 
@@ -58,9 +61,9 @@ SetAttributes[d,Orderless];
 d[p1_Plus,p2_]:=Map[d[#,p2]&,p1];
 d[p1_,num__ p2_?LVecQ]:=num d[p1,p2];
 d[p1_,num__?(FreeQ[#,_?LVecQ]&) p2_Plus]:=num d[p1,p2];
-d[p1:{__},p2:{__}]:=p1 . p2-2p1[[1]]p2[[1]];
+d[p1:{__},p2:{__}]:=MetricSignature*(p1 . p2-2p1[[1]]p2[[1]]);
 d2[p_]:=d[p,p];
-d2[p:{__}]:=p . p-2p[[1]]^2;
+d2[p:{__}]:=MetricSignature*(p . p-2p[[1]]^2);
 
 (*---Mandelstam basis generation---*)
 PBasis[pList_]:=Module[{n,pp,ret},n=Length[pList];
