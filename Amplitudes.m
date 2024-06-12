@@ -19,15 +19,22 @@ Spbb::usage="Spbb[x,y] is the 4D double brack spinor product [xy].";
 SpBasis::usage="SpBasis[SpinorList] returns an independent set of Spaa's and Spbb's.";
 RepSpAnalytical::usage="RepSpAnalytical[SpinorList] returns a list of replacement rules that will analytically reduce the Spaa's and Spbb's to the basis given by SpBasis.  These replacement rules solve momentum conservation and the Schouten identity.";
 RepSpNumerical::usage="RepSpNumerical[SpinorList] is a list of replacement rules that replaces all Spaa's and Spbb's with rational numbers of order RndMax where RndMax is a global variable.";
-DDMTofabc::usage="DDMTofabc[expr,cList] converts an expression from DDM half ladder (multiperipheral form) color factors DDM[a1,a2,a3,a4,a5,...] to fabc[a1,a2,c1]fabc[c1,a3,c2]...";
+DDMTofabc::usage="DDMTofabc[expr,cHead] converts an expression from DDM half ladder color factors DDM[a1,a2,a3,a4,a5,...] to fabc[a1,a2,cHead[1]]fabc[cHead[1],a3,cHead[2]]...";
 DDMBasis::usage="DDMBasis[VarList,LeftAnchor,RightAnchor] generates a list of DDM half ladder (multiperipheral form) color factors {DDM[LeftAnchor, sigma, RightAnchor]} where sigma runs over the permutations of the remaining variables in VarList";
 fabcToDDMAnalytical::usage="fabcToDDMAnalytical[expr,LeftAnchor,RightAnchor] takes an expression of fabc[x1,y1,z1]fabc[x2,y2,z2]... and converts it into a linear combination of DDM half ladder (multiperipheral form) basis elements of the form DDM[LeftAnchor,...,RightAnchor]";
 fabcToDDMNumerical::usage="fabcToDDMNumerical[expr,LeftAnchor,RightAnchor] takes an expression of fabc[x1,y1,z1]fabc[x2,y2,z2]... and converts it into a linear combination of DDM half ladder (multiperipheral form) basis elements of the form DDM[LeftAnchor,...,RightAnchor] and then replaces the DDM basis elements with random numbers in the range {1,RndMax} where RndMax is a global variable";
 RepDDMNumerical::usage="RepDDMNumerical[VarList,LeftAnchor,RightAnchor] returns a list of replacement rules to replace the DDM basis given by DDMBasis[VarList,LeftAnchor,RightAnchor] with numbers in the range {1,RndMax} where RndMax is a global variable";
-DDMToTrSUN::usage="DDMToTrSUN[expr, LeftAnchor] takes an expression of DDM[a1,a2,a3...] and converts it into a linear combination of TrSUN[LeftAnchor,...] using the normalizations of Elvang and Huang BUT DROPPING ALL FACTORS OF i as in the appendix to Carrasco's TASI lectures.";
-DDM::usage = "DDM[a1,a2,...] is the head/variable (not a function!) used to represent the DDM half ladder/multiperipheral form color factors.";
+DDMToTrSUN::usage="DDMToTrSUN[expr] takes an expression of DDM[a1,a2,a3...] and converts it into a linear combination of tr[...] using the normalizations of Elvang and Huang BUT DROPPING ALL FACTORS OF i as in the appendix to Carrasco's TASI lectures.";
+DDMToTrUN::usage="DDMToTrUN[expr] takes an expression of DDM[a1,a2,a3...] and converts it into a linear combination of tr[...] using the normalizations of Elvang and Huang BUT DROPPING ALL FACTORS OF i as in the appendix to Carrasco's TASI lectures.";
+DDM::usage = "DDM[a1,a2,...] is the Head used to represent the DDM half ladder/multiperipheral form color factors.";
 fabc::usage="fabc[a,b,c] is the Head used to represent the structure constant fabc.";
-TrSUN::usage="TrSUN[a1,a2,a3...] is the head/variable (not a function!) used to represent the SU(N) trace over the generators Tr[T^a1 T^a2...]";
+dabc::usage="dabc[a,b,c] is the Head used to represent the structure constant dabc.";
+fabcToTr::usage="fabcToTr[expr] converts fabc[...] to tr[...].";
+dabcToTr::usage="dabcToTr[expr] converts dabc[...] to tr[...].";
+tr::usage="tr[a1,a2,a3...] is the Head used to represent the U(N) or SU(N) trace over the generators Tr[T^a1 T^a2...]";
+Nc::usage="Nc is the Symbol used to represent the number of colors in U(Nc) or SU(Nc).";
+TrCanonicalizeSUN::usage="TrCanonicalizeSUN[expr] expands expr, converts objects like tr[...]tr[...] to tr[...] where possible, and canonicalizes all traces.  The traces are assumed to act on generators of SU(N).";
+TrCanonicalizeUN::usage="TrCanonicalizeUN[expr] expands expr, converts objects like tr[...]tr[...] to tr[...] where possible, and canonicalizes all traces.  The traces are assumed to act on generators of U(N).";
 ListMult::usage="ListMult[list1,list2] returns the pairwise multiplication of the lists and deletes the duplicates";
 ListPower::usage="ListPower[list,n] returns the pairwise multiplication of list with itself n times";
 RepList::usage="RepList[ListOld,ListNew] generates a set of replacement rules to replace the entries of ListOld with the entries of ListNew";
@@ -49,12 +56,15 @@ MetricSignature::usage="MetricSignature controls the sign of the signature of d[
 
 Begin["`Private`"]
 
+
 (*---Define LVecList---*)
 LVecHeads={};
 RetLVecHeads:=LVecHeads;
 LVecQ[vec_]:=MemberQ[LVecHeads,Head[vec]]; 
 AddLVecHeads[p__]:=(LVecHeads=Union[LVecHeads,{p}];);
 DelLVecHeads[p_]:=(LVecHeads=DeleteCases[LVecHeads,p];);
+
+
 
 (*---Define the Lorentz product---*)
 SetAttributes[d,Orderless];
@@ -64,6 +74,8 @@ d[p1_,num__?(FreeQ[#,_?LVecQ]&) p2_Plus]:=num d[p1,p2];
 d[p1:{__},p2:{__}]:=MetricSignature*(p1 . p2-2p1[[1]]p2[[1]]);
 d2[p_]:=d[p,p];
 d2[p:{__}]:=MetricSignature*(p . p-2p[[1]]^2);
+
+
 
 (*---Mandelstam basis generation---*)
 PBasis[pList_]:=Module[{n,pp,ret},n=Length[pList];
@@ -112,6 +124,8 @@ RepPAndENumerical[pList_,eList_,m_:0]:=Module[{basis,ret},basis=PAndEBasis[pList
 ret=MapThread[Rule,{basis,RndInt[Length[basis]]}];
 Join[ret,RepPAndEAnalytical[pList,eList,m]/.ret]];
 
+
+
 (*---4D spinors---*)
 Spaa[x_,y_]:=-Spaa[y,x]/;!OrderedQ[{x,y}];(*Implement antisymmetry*)
 Spbb[x_,y_]:=-Spbb[y,x]/;!OrderedQ[{x,y}];
@@ -140,9 +154,25 @@ Flatten[Join[RepSpAnalytical[s]/.NumRepBasis,NumRepBasis]]];
 
 (*I still need to implement the rule d[a,b]\[Rule]1/2Spaa[a,b]Spbb[a,b].*)
 
+
+
 (*---Define the DDM half ladder basis/multiperipheral form for color structues---*)
 
-DDMTofabc[expr_,cList_]:=expr/.DDM[x__]:>Apply[Times,Map[Apply[fabc,#]&,Partition[Flatten[Join[{{x}[[1]]},Riffle[{x}[[2;;-3]],Map[{#,#}&,cList]],{x}[[-2;;]]]],3]]];
+Clear[CanonicalizeListRotation];
+CanonicalizeListRotation[list_]:=
+Module[{i},Table[RotateLeft[list,i],{i,1,Length[list]}]//Sort//First
+];
+
+tr[x__]:=tr@@CanonicalizeListRotation[{x}]/;{x}=!=CanonicalizeListRotation[{x}];
+
+fabcToTr[expr_]:=expr/.fabc[a_,b_,c_]:>tr[a,b,c]-tr[b,a,c];
+dabcToTr[expr_]:=expr/.dabc[a_,b_,c_]:>tr[a,b,c]+tr[b,a,c];
+
+DDMTofabc[expr_,cHead_]:=
+expr/.DDM[x__]:>Module[{cList},
+cList=Array[cHead,Length[{x}]-3];
+Apply[Times,Map[Apply[fabc,#]&,Partition[Flatten[Join[{{x}[[1]]},Riffle[{x}[[2;;-3]],Map[{#,#}&,cList]],{x}[[-2;;]]]],3]]]
+];
 
 DDMBasis[VarList_,LeftAnchor_,RightAnchor_]:=
 Map[Apply[DDM,Join[{LeftAnchor},#,{RightAnchor}]]&,Permutations[DeleteCases[DeleteCases[VarList,LeftAnchor],RightAnchor]]];
@@ -196,15 +226,66 @@ ret/.Map[Rule[#,RandomInteger[{1,RndMax}]]&,DDMBasis[DDMVars,LeftAnchor,RightAnc
 
 RepDDMNumerical[VarList_,LeftAnchor_,RightAnchor_]:=Map[Rule[#,RandomInteger[{1,RndMax}]]&,DDMBasis[VarList,LeftAnchor,RightAnchor]];
 
-DDMToTrSUN[expr_,LeftAnchor_]:=Module[{func},
+
+TrCanonicalizeSUN[expr_]:=Module[{rules,repRules},
+rules={
+tr[w___,a_]^2:>tr[w,w]-1/Nc tr[w]^2,
+
+tr[a_,w___]^2:>tr[w,w]-1/Nc tr[w]^2,
+
+Times[f1___,HoldPattern[tr[w___,a_,x___]],f2___,HoldPattern[tr[y___,a_,z___]],f3___]:>Times[f1,f2,f3,tr[x,w,z,y]-1/Nc tr[x,w]tr[z,y]],
+
+HoldPattern[tr[x___,a_,y___,a_,z___]]:>tr[x,z]tr[y]-1/Nc tr[x,y,z],
+
+tr[a_,a_]:>Nc^2-1,
+
+tr[]:>Nc,
+
+tr[a_]:>0
+};
+repRules[x_]:=Fold[#1/.#2&,x,rules];
+FixedPoint[(#//Expand//repRules)&,expr] (*There's a smarter way to do this Expand in fabcToDDMAnalytical*)
+];
+(*See the end of JJ's TASI notes https://arxiv.org/pdf/1506.00974*)
+
+
+TrCanonicalizeUN[expr_]:=Module[{rules,repRules},
+rules={
+tr[w___,a_]^2:>tr[w,w],
+
+tr[a_,w___]^2:>tr[w,w],
+
+Times[f1___,HoldPattern[tr[w___,a_,x___]],f2___,HoldPattern[tr[y___,a_,z___]],f3___]:>Times[f1,f2,f3,tr[x,w,z,y]],
+
+HoldPattern[tr[x___,a_,y___,a_,z___]]:>tr[x,z]tr[y],
+
+tr[a_,a_]:>Nc^2,
+
+tr[]:>Nc
+};
+repRules[x_]:=Fold[#1/.#2&,x,rules];
+FixedPoint[(#//Expand//repRules)&,expr] (*There's a smarter way to do this Expand in fabcToDDMAnalytical*)
+];
+(*See https://scipp.ucsc.edu/~haber/ph218/sunid17.pdf and then remember that SU(N) has N^2-1 traceless hermitian generators and U(N) has N^2 hermitian (not necessarily traceless) generators.*)
+
+
+(*DDMToTr[expr_,LeftAnchor_]:=Module[{func},
 func[input__]:=Module[{ret,len,c,cArr},
 len=Length[{input}];
 cArr=Array[c,len-3];
-ret=Expand[DDMTofabc[DDM[input],cArr]/.fabc[x_,y_,z_]:>(*-I*)(TrSUN[x,y,z]-TrSUN[y,x,z])];
-Table[ret=ret/.TrSUN[x__]:>TrSUN@@RotateLeft[{x},FirstPosition[{x},ci]-1]/;!FreeQ[{x},ci]/.TrSUN[ci,x___]TrSUN[ci,y___]:>TrSUN[x,y];,{ci,cArr}];
-ret/.TrSUN[x__]:>TrSUN@@RotateLeft[{x},FirstPosition[{x},First[{input}]]-1]
+ret=Expand[DDMTofabc[DDM[input],cArr]//fabcToTr];
+Table[ret=ret/.tr[x__]:>tr@@RotateLeft[{x},FirstPosition[{x},ci]-1]/;!FreeQ[{x},ci]/.tr[ci,x___]tr[ci,y___]:>tr[x,y];,{ci,cArr}];
+ret/.tr[x__]:>tr@@RotateLeft[{x},FirstPosition[{x},First[{input}]]-1]
 ];
-(expr/.DDM[x__]:>func[x])/.TrSUN[x__]:>TrSUN@@RotateLeft[{x},FirstPosition[{x},LeftAnchor]-1]
+(expr/.DDM[x__]:>func[x])/.tr[x__]:>tr@@RotateLeft[{x},FirstPosition[{x},LeftAnchor]-1]
+];*)
+
+DDMToTrSUN[expr_]:=Module[{c},
+expr/.DDM[x__]:>(DDM[x]//DDMTofabc[#,c]&//fabcToTr//TrCanonicalizeSUN)
+];
+
+DDMToTrUN[expr_]:=Module[{c},
+expr/.DDM[x__]:>(DDM[x]//DDMTofabc[#,c]&//fabcToTr//TrCanonicalizeUN)
 ];
 
 
@@ -252,4 +333,4 @@ ContractMu[mu_,dim_][expr_]:=Expand[expr]//.{d[mu[z_],x_]d[mu[z_],y_]:>d[x,y],d[
 End[]
 EndPackage[]
 
-Print["\n --- AMPLITUDES --- \n\n This package implements several things for working with scattering amplitudes:  1) The Minkowski dot product in any spacetime dimension in the mostly plus signature (-+++...).  2) Some 4D spinor things.  3)  Some color (fabc) stuff including how to reduce to DDM/half ladder/multiperipheral form basis.  I use the conventions of Elvang and Huang or Srednicki."];
+Print["\n --- AMPLITUDES --- \n\n This package implements several things for working with scattering amplitudes:  1) The Minkowski dot product in any spacetime dimension in the mostly plus signature (-+++...).  2) Some 4D spinor things.  3)  Some color (fabc and dabc) stuff including how to reduce to DDM/half ladder basis and simplify trace expressions.  I use the conventions of Elvang and Huang or Srednicki."];
