@@ -178,7 +178,8 @@ DDMBasis[VarList_,LeftAnchor_,RightAnchor_]:=
 Map[Apply[DDM,Join[{LeftAnchor},#,{RightAnchor}]]&,Permutations[DeleteCases[DeleteCases[VarList,LeftAnchor],RightAnchor]]];
 
 fabcToDDMAnalytical[expr_,LeftAnchor_,RightAnchor_]:=Module[{ret,fProd,NewMiddle,DealWithMiddle,SignFlipMiddle},
-ret=expr;ret=ret//.x_ y_:>Map[Times[#,x]&,y]/;(Head[y]===Plus&&!FreeQ[x,fabc]&&!FreeQ[y,fabc]);(*This expands all necessary products invovling fabc's*)
+ret=expr;
+ret=ret//.x_*y_:>Map[Times[#,x]&,y]/;(Head[y]===Plus&&!FreeQ[x,fabc]&&!FreeQ[y,fabc]);(*This expands all necessary products invovling fabc's*)
 ret=ret/.fabc[x__]:>fProd[{x}]//.fProd[x__]fProd[y__]:>fProd[x,y];(*Convert fabc's to fProds's*)
 ret=ret/.fProd[x__]:>fProd[{},{},{x}];
 
@@ -227,8 +228,7 @@ ret/.Map[Rule[#,RandomInteger[{1,RndMax}]]&,DDMBasis[DDMVars,LeftAnchor,RightAnc
 RepDDMNumerical[VarList_,LeftAnchor_,RightAnchor_]:=Map[Rule[#,RandomInteger[{1,RndMax}]]&,DDMBasis[VarList,LeftAnchor,RightAnchor]];
 
 
-TrCanonicalizeSUN[expr_]:=Module[{rules,repRules},
-rules={
+SimplificationRulesTrSUN={
 tr[w___,a_]^2:>tr[w,w]-1/Nc tr[w]^2,
 
 tr[a_,w___]^2:>tr[w,w]-1/Nc tr[w]^2,
@@ -243,14 +243,10 @@ tr[]:>Nc,
 
 tr[a_]:>0
 };
-repRules[x_]:=Fold[#1/.#2&,x,rules];
-FixedPoint[(#//Expand//repRules)&,expr] (*There's a smarter way to do this Expand in fabcToDDMAnalytical*)
-];
 (*See the end of JJ's TASI notes https://arxiv.org/pdf/1506.00974*)
 
 
-TrCanonicalizeUN[expr_]:=Module[{rules,repRules},
-rules={
+SimplificationRulesTrUN={
 tr[w___,a_]^2:>tr[w,w],
 
 tr[a_,w___]^2:>tr[w,w],
@@ -263,22 +259,21 @@ tr[a_,a_]:>Nc^2,
 
 tr[]:>Nc
 };
-repRules[x_]:=Fold[#1/.#2&,x,rules];
-FixedPoint[(#//Expand//repRules)&,expr] (*There's a smarter way to do this Expand in fabcToDDMAnalytical*)
-];
 (*See https://scipp.ucsc.edu/~haber/ph218/sunid17.pdf and then remember that SU(N) has N^2-1 traceless hermitian generators and U(N) has N^2 hermitian (not necessarily traceless) generators.*)
 
 
-(*DDMToTr[expr_,LeftAnchor_]:=Module[{func},
-func[input__]:=Module[{ret,len,c,cArr},
-len=Length[{input}];
-cArr=Array[c,len-3];
-ret=Expand[DDMTofabc[DDM[input],cArr]//fabcToTr];
-Table[ret=ret/.tr[x__]:>tr@@RotateLeft[{x},FirstPosition[{x},ci]-1]/;!FreeQ[{x},ci]/.tr[ci,x___]tr[ci,y___]:>tr[x,y];,{ci,cArr}];
-ret/.tr[x__]:>tr@@RotateLeft[{x},FirstPosition[{x},First[{input}]]-1]
+TrCanonicalizeHelper[expr_,rules_]:=Module[{repRules,SmartExpand},
+repRules[x_]:=Fold[#1/.#2&,x,rules];
+(*FixedPoint[(#//Expand//repRules)&,expr]*)
+(*There's a smarter way to do this Expand in fabcToDDMAnalytical*)
+SmartExpand[expression_]:=expression//.x_*y_:>Map[Times[#,x]&,y]/;(Head[y]===Plus&&!FreeQ[x,tr]&&!FreeQ[y,tr]);
+FixedPoint[(#//SmartExpand//repRules)&,expr]
 ];
-(expr/.DDM[x__]:>func[x])/.tr[x__]:>tr@@RotateLeft[{x},FirstPosition[{x},LeftAnchor]-1]
-];*)
+
+
+TrCanonicalizeSUN[expr_]:=TrCanonicalizeHelper[expr,SimplificationRulesTrSUN];
+TrCanonicalizeUN[expr_]:=TrCanonicalizeHelper[expr,SimplificationRulesTrUN];
+
 
 DDMToTrSUN[expr_]:=Module[{c},
 expr/.DDM[x__]:>(DDM[x]//DDMTofabc[#,c]&//fabcToTr//TrCanonicalizeSUN)
@@ -296,7 +291,7 @@ ListMult[list_,{}]:=list;
 ListMult[{},list_]:=list;
 ListPower[list_,0]:={};
 ListPower[list_,k_]:=ListMult[ListPower[list,k-1],list];(*This recursive definition with the ugly DeleteDuplicates is somehow 100 to 1000 times faster than anything else I could make especially for small powers*)
-(*Cliff also suggested a different fast way of generating a mandelstam basis which is to sum up all of the PBasis elements, rais the sum to a power, and then call Expand.*)
+(*Cliff also suggested a different fast way of generating a mandelstam basis which is to sum up all of the PBasis elements, raise the sum to a power, and then call Expand.*)
 
 
 (*---Replacement functions, cyclic sums, and fundamental BCJ ---*)
