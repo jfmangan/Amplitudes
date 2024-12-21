@@ -45,6 +45,7 @@ CyclicSumPAndE::usage="CyclicSumPAndE[expr,pList,eList,MaxCycle] computes the cy
 PermSumP::usage="PermSumP[expr,pList] computes the permutation sum of the expression over all permutations of the momenta in pList";
 BCJp::usage="BCJp[amp,pList] returns the fundamental BCJ relation of the amplitude (amp) that depends on momenta (pList).";
 BCJpe::usage="BCJpe[amp,pList,eList] returns the fundamental BCJ relation of the amplitude (amp) that depends on momenta (pList) and polarization vectors (eList).";
+KLT::usage="KLT[LAmpHead, RAmpHead, pHead, n] returns the n-pt KLT product.  pHead is the Head of the momentum label, e.g., if momenta look like p[1], p[17]... then pHead is p.  LAmpHead is the Head such that LAmpHead[{p[1],p[7]...}] returns the desired color-ordered amplitude.  So for example LAmpHead could be NLSM or YM or BS, etc.  Of course YM carries polarization labels so in the end you have to apply some replacement rule like YM[pList_]:>YM[pList,e/@pList].  RAmpHead behaves just like LAmpHead.";
 ContractMu::usage="ContractMu[mu,dim][expr] will expand the expression and contract mu indices.  For example ContractMu[mu,dim][d[mu[1],x]d[mu[1],y]] returns d[x,y] and ContractMu[mu,dim][d[mu[1],mu[1]] returns dim (the spacetime dimension).";
 
 RndMax=10;
@@ -318,6 +319,24 @@ Sum[CyclicPermPAndE[x,pList,eList,i],{i,0,MaxCycle-1}];
 BCJp[amp_,pList_]:=Sum[Sum[d[pList[[2]],pList[[j]]],{j,3,i}](amp/.RepList[pList,Insert[Delete[pList,2],pList[[2]],i]]),{i,3,Length[pList]}];
 
 BCJpe[amp_,pList_,eList_]:=Sum[Sum[d[pList[[2]],pList[[j]]],{j,3,i}](amp/.RepList[Join[pList,eList],Join[Insert[Delete[pList,2],pList[[2]],i],Insert[Delete[eList,2],eList[[2]],i]]]),{i,3,Length[pList]}];
+
+
+KLT[LAmpHead_, RAmpHead_, pHead_, n_] := Module[{j, jBar, s, g, f, fBar, AmpL, AmpR, nOver2Floor, nOver2Ceil},
+   nOver2Floor = Floor[n/2];
+   nOver2Ceil = Ceiling[n/2];
+   g[i_, j_] := If[i > j, s[i, j], 0];
+   j = nOver2Floor - 1;
+   jBar = nOver2Ceil - 2;
+   
+   f[i_List] :=
+    If[Length[i] > 0, s[1, i[[j]]], 1]*Product[s[1, i[[m]]] + Sum[g[i[[m]], i[[k]]], {k, m + 1, j}], {m, 1, j - 1}];
+   
+   fBar[l_List] :=
+    If[Length[l] > 0, s[l[[1]], n - 1], 1]*Product[s[l[[m]], n - 1] + Sum[g[l[[k]], l[[m]]], {k, 1, m - 1}], {m, 2, jBar}];
+   
+   (-1)^(n + 1)*AmpL[Range[n]]*Sum[f[i] fBar[l] AmpR[Join[i, {1, n - 1}, l, {n}]], {i, Permutations[Range[2, nOver2Floor]]}, {l, Permutations[Range[nOver2Floor + 1, n - 2]]}] /. AmpL[list_] :> AmpL[pHead /@ list] /. AmpR[list_] :> AmpR[pHead /@ list] /. s[x_, y_] :> s[pHead[x], pHead[y]] // PermSumP[#, pHead /@ Range[2, n - 2]] & // # /. s[x_, y_] :> 2 d[x, y] & // # /. AmpL -> LAmpHead & // # /. AmpR -> RAmpHead &
+   ];
+(*From hep-th/9811140*)
 
 
 (*--- Contract mu indices ---*)
