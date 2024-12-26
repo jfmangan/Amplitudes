@@ -41,6 +41,7 @@ TrCanonicalizeUN::usage="TrCanonicalizeUN[expr] expands expr, converts objects l
 ListMult::usage="ListMult[list1,list2] returns the pairwise multiplication of the lists and deletes the duplicates";
 ListPower::usage="ListPower[list,n] returns the pairwise multiplication of list with itself n times";
 RepList::usage="RepList[ListOld,ListNew] generates a set of replacement rules to replace the entries of ListOld with the entries of ListNew";
+RepListWithRndNums::usage="RepListWithRndNums[list] maps every element of 'list' to a separate random number in the range {1,RndMax}.";
 CyclicPermP::usage="CyclicPermP[expr,pList,cycle] cycliclally permutes the momenta in the expression and returns the result.  Cycle=0 returns the original expression, cycle=1 permutes the momenta once 1->2, 2->3, etc.";
 CyclicPermPAndE::usage="CyclicPermPAndE[expr,pList,eList,cycle] cycliclally permutes the momenta and polarization vectors in the expression and returns the result.  Cycle=0 returns the original expression, cycle=1 permutes the momenta once 1->2, 2->3, etc.";
 CyclicSumP::usage="CyclicSumP[expr,pList,MaxCycle] computes the cyclic sum of the expression over the momenta.  MaxCycle=1 just returns the original expression, MaxCycle=2 returns the original expression plus the expression with the momenta cycled one position to the left, etc.";
@@ -120,24 +121,24 @@ Flatten[Join[ret,Table[pe[n,i]->-Sum[pe[j,i],{j,1,n-1}]/.pe[i,i]->0,{i,1,n-1}]]]
 
 RepPAndEAndEBarAnalytical[pList_,eList_,eBarList_,m_:0]:=Join[RepPAndEAnalytical[pList,eList,m],RepPAndEAnalytical[pList,eBarList,m]]//DeleteDuplicates;
 
-RndInt[n_]:=RandomInteger[{1,RndMax},{n}];(*The reason you take random ints from 1 to RndMax is that almost all of the Mandelstams are positive.  This means that it is very unlikely to have a propagator that is identically zero.  Most of the negative Mandelstams will come from conserving momentum so those negative Mandelstams will never make a propagator negative since you'd never have a propagator involving all the momenta since that'd be identically zero no matter what.*)
-(*Fix p1.p2 using 0=pn^2=(p1+p2+...)^2*)
+(*The reason you take random ints from 1 to RndMax is that almost all of the Mandelstams are positive.  This means that it is very unlikely to have a propagator that is identically zero.  Most of the negative Mandelstams will come from conserving momentum so those negative Mandelstams will never make a propagator negative since you'd never have a propagator involving all the momenta since that'd be identically zero no matter what.*)
+RepListWithRndNums[list_]:=MapThread[Rule,{list,RandomInteger[{1,RndMax},Length[list]]}];
 
 RepPNumerical[pList_,m_:0]:=Module[{basis,ret},
 basis=PBasis[pList];
-ret=MapThread[Rule,{basis,RndInt[Length[basis]]}];
+ret=RepListWithRndNums[basis];
 Join[ret,RepPAnalytical[pList,m]/.ret]
 ];
 
 RepPAndENumerical[pList_,eList_,m_:0]:=Module[{basis,ret},
 basis=PAndEBasis[pList,eList];
-ret=MapThread[Rule,{basis,RndInt[Length[basis]]}];
+ret=RepListWithRndNums[basis];
 Join[ret,RepPAndEAnalytical[pList,eList,m]/.ret]
 ];
 
 RepPAndEAndEBarNumerical[pList_,eList_,eBarList_,m_:0]:=Module[{basis,ret},
 basis=PAndEAndEBarBasis[pList,eList,eBarList];
-ret=MapThread[Rule,{basis,RndInt[Length[basis]]}];
+ret=RepListWithRndNums[basis];
 Join[ret,RepPAndEAndEBarAnalytical[pList,eList,eBarList,m]/.ret]
 ];
 
@@ -165,7 +166,7 @@ RepSpAnalytical[s_]:=Flatten[Join[SpSchouten[s]/.SpConserveP[s],SpConserveP[s]]]
 
 RepSpNumerical[s_]:=Module[{NumRepBasis,basis},
 basis=DeleteCases[SpBasis[s],Spaa[s[[1]],s[[3]]]];(*If <13><24> = <23><14> you'll divide by zero when conserving momentum so we'll avoid that by taking <13> \[NotEqual] <23><14>/<24> and the rest to be integers greather than 1.*)
-NumRepBasis=MapThread[Rule[#1,#2]&,{basis,RandomInteger[{1,RndMax},Length[basis]]}];
+NumRepBasis=RepListWithRndNums[basis];
 NumRepBasis=Flatten[Join[NumRepBasis,{Spaa[s[[1]],s[[3]]]->RandomChoice[DeleteCases[Range[RndMax],Spaa[s[[2]],s[[3]]]Spaa[s[[1]],s[[4]]]/Spaa[s[[2]],s[[4]]]/.NumRepBasis]]}]];
 Flatten[Join[RepSpAnalytical[s]/.NumRepBasis,NumRepBasis]]];
 
@@ -240,9 +241,10 @@ ret/.fProd[x__,{},{}]:>Apply[DDM,Map[First[#]&,Select[Tally[Flatten[x]],Last[#]=
 fabcToDDMNumerical[expr_,LeftAnchor_,RightAnchor_]:=Module[{ret,DDMVars},
 ret=fabcToDDMAnalytical[expr,LeftAnchor,RightAnchor];
 DDMVars=Apply[FullForm[ret][[##]]&,Drop[FirstPosition[FullForm[ret],DDM],-1]]/.DDM[x__]:>DeleteCases[DeleteCases[{x},LeftAnchor],RightAnchor];
-ret/.Map[Rule[#,RandomInteger[{1,RndMax}]]&,DDMBasis[DDMVars,LeftAnchor,RightAnchor]]];
+ret/.RepListWithRndNums[DDMBasis[DDMVars,LeftAnchor,RightAnchor]]
+];
 
-RepDDMNumerical[VarList_,LeftAnchor_,RightAnchor_]:=Map[Rule[#,RandomInteger[{1,RndMax}]]&,DDMBasis[VarList,LeftAnchor,RightAnchor]];
+RepDDMNumerical[VarList_,LeftAnchor_,RightAnchor_]:=RepListWithRndNums[DDMBasis[VarList,LeftAnchor,RightAnchor]];
 
 
 SimplificationRulesTrSUN={
